@@ -1,0 +1,1 @@
+{"name":"satyr-velvet-night","private":true,"version":"0.1.0","scripts":{"start":"node server.cjs","check":"node --check live/game.js","test":"node tests/game.test.cjs"}}

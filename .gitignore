@@ -1,0 +1,17 @@
+source-inspection/installer/
+source-inspection/installer.cab
+source-inspection/SvenBomwollen-DL.exe
+source-inspection/extracted/
+source-inspection/vendor/
+source-inspection/*disassembly*
+art/raw/
+__pycache__/
+*.pyc
+dist/
+frames/
+study/critique/
+source-inspection/
+art/requests/
+art/logs/
+art/prompts/
+publish-result.json
