@@ -63,7 +63,7 @@ function crouchLeg(sprite,side,drop){
   spritePart(sprite,upper);ctx.restore();spritePart(sprite,lower);
 }function headPose(sprite,tilt,nod=0){
   const neck=sprite.parts.head.pivot;
-  ctx.save();ctx.translate(neck[0],neck[1]);ctx.scale(1,1-.1*nod);ctx.translate(-neck[0],-neck[1]);spritePart(sprite,'head',tilt);ctx.restore();
+  ctx.save();ctx.translate(neck[0],neck[1]);ctx.scale(1,1-.24*nod);ctx.translate(-neck[0],-neck[1]);spritePart(sprite,'head',tilt);ctx.restore();
 }
 function actor(entity,kind,scale=1,performing=false){
   const pose=duetPose(entity),x=pose.x,y=pose.y,s=atlas?.actors[kind];
@@ -76,7 +76,7 @@ function actor(entity,kind,scale=1,performing=false){
   const progress=Math.max(0,Math.min(1,entity.progress||0));
   const crouch=active?Math.sin(Math.PI*progress)*duet.amount:0;
   const idle=kind>1&&!performing?Math.sin(phase*1.8)*.35:0;
-  const nod=active?(1-Math.cos(progress*Math.PI*4))*.5:0;
+  const nod=active?(1-Math.cos(progress*Math.PI*6))*.5:0;
   ellipse(x,y+2,size*.27,size*.085,'#24102566');
   if(kind===0&&entity.invuln>0&&sim.mode==='playing'&&Math.sin(clock*17)<-.3)ctx.globalAlpha=.5;
   ctx.save();ctx.translate(x,y-(walking?Math.abs(step)*(kind===0?1.5:.85):0));
@@ -97,7 +97,7 @@ function actor(entity,kind,scale=1,performing=false){
     limb(s,'leftArm','leftForearm',-step*.2+idle*.35+shock+active*.18,crouch*.22);
     limb(s,'rightArm','rightForearm',step*.2-idle*.35-shock-active*.18,-crouch*.22);
     spritePart(s,'body',walking?step*.022:idle*.025,0,!walking&&!performing?Math.sin(clock*2+kind)*2:0);
-    headPose(s,active?Math.sin(progress*Math.PI*2)*.11:idle*.05+(!walking?Math.sin(clock*.8+kind)*.012:0),nod);
+    headPose(s,active?Math.sin(progress*Math.PI*2)*.08:idle*.05+(!walking?Math.sin(clock*.8+kind)*.012:0),nod);
     ctx.restore();
   }else{
     ellipse(0,-size*.5,size*.21,size*.3,['#95547a','#29232b','#c37396','#55a69d'][kind]);
@@ -112,5 +112,5 @@ function mood(d){const posed=duetPose(d);d={...d,x:posed.x,y:posed.y,selected:si
 function pickup(item,t){if(!item.active)return;const y=item.y-8+Math.sin(t*2+item.x)*2;ellipse(item.x,item.y+3,12,4,'#2b172944');ctx.save();ctx.translate(item.x,y);ctx.rotate(Math.sin(t+item.x)*.08);ctx.fillStyle='#553148';ctx.strokeStyle='#d5a65e';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(0,-14);ctx.lineTo(12,0);ctx.lineTo(0,14);ctx.lineTo(-12,0);ctx.closePath();ctx.fill();ctx.stroke();text(({vibe:'3',spotlight:'5',vip:'15'})[item.kind],0,5,14,'#f1d492');ctx.restore();}
 function render(t){ctx.setTransform(2,0,0,2,0,0);ctx.clearRect(0,0,540,960);ctx.fillStyle='#101421';ctx.fillRect(0,0,540,960);if(QA)updateCamera(0,true);ctx.save();const view=camera.viewport;ctx.beginPath();ctx.rect(view.x,view.y,view.width,view.height);ctx.clip();ctx.translate(view.x+view.width/2,view.y+view.height/2);ctx.scale(camera.zoom,camera.zoom);ctx.translate(-camera.x,-camera.y);if(shake>0)ctx.translate(Math.sin(t*74)*shake*7,Math.cos(t*81)*shake*4);backdrop();lights(t);if(sim.badLight){ctx.fillStyle='#1d12383d';ctx.fillRect(0,180,540,595);}for(const p of sim.pickups)pickup(p,t);const actors=sim.dancers.map(d=>({e:d,k:d.kind,scale:1}));actors.push({e:sim.player,k:0,scale:1});for(const g of sim.guards)actors.push({e:g,k:1,scale:g.assistant?.92:1});actors.sort((a,b)=>a.e.y-b.e.y);for(const a of actors){ctx.save();if(a.e.done)ctx.globalAlpha=.55;actor(a.e,a.k,a.scale,duet.amount>.15&&(a.e===duet.target||a.k===0));ctx.restore();}for(const d of sim.dancers)mood(d);for(const p of particles){ctx.save();ctx.globalAlpha=Math.max(0,p.life/p.max);ctx.translate(p.x,p.y);ctx.rotate(p.life*2);ctx.fillStyle=p.color;ctx.beginPath();ctx.moveTo(0,-p.size*1.8);ctx.quadraticCurveTo(p.size*.3,-p.size*.2,p.size,0);ctx.quadraticCurveTo(p.size*.2,p.size*.3,0,p.size*1.8);ctx.quadraticCurveTo(-p.size*.3,p.size*.2,-p.size,0);ctx.quadraticCurveTo(-p.size*.2,-p.size*.3,0,-p.size*1.8);ctx.fill();ctx.restore();}for(const f of floaters){ctx.globalAlpha=Math.max(0,f.life);text(f.text,f.x,f.y,24,'#ffe7a6');}ctx.globalAlpha=1;ctx.restore();ctx.save();const bottom=ctx.createLinearGradient(0,730,0,800);bottom.addColorStop(0,'#10142100');bottom.addColorStop(1,'#101421cc');ctx.fillStyle=bottom;ctx.fillRect(0,730,540,70);ctx.restore();}
 function tick(now){const dt=Math.min(.05,Math.max(0,(now-last)/1000||0));last=now;if(!QA)clock+=dt;updateInput();sim.step(QA?0:dt,input);consumeEvents();updateDuet(QA?0:dt);if(sim.mode==='playing'){for(const p of particles){p.x+=p.vx*dt;p.y+=p.vy*dt;p.vy+=25*dt;p.life-=dt;}particles=particles.filter(p=>p.life>0);for(const f of floaters){f.y-=dt*22;f.life-=dt;}floaters=floaters.filter(f=>f.life>0);}if(sim.mode==='playing')reaction.remaining=Math.max(0,reaction.remaining-dt);shake=Math.max(0,shake-dt);if(toastTimer>0){toastTimer-=dt;if(toastTimer<=0)$('toast').classList.remove('visible');}if(now>nextUI){updateUI();nextUI=now+80;}updateCamera(dt,QA);render(clock);requestAnimationFrame(tick);}
-async function load(){const paths={club:'assets/club.png',cast:'assets/cast.png'};await Promise.all(Object.entries(paths).map(async([key,src])=>{const im=new Image();im.src=src;try{await im.decode();images[key]=im;}catch{console.warn('Asset unavailable:',src);}}));atlas=globalThis.ACTOR_ATLAS||null;$('loading').hidden=true;saveRecord();updateUI();if(params.has('play')){sim.start();$('overlay').hidden=true;}if(QA){sim.start();$('overlay').hidden=true;clock=Number(params.get('time'))||3;sim.player.invuln=0;}updateCamera(0,true);window.__game={sim,input,render,updateUI,images,atlas,camera,controls,duet,version:'0.3.1'};requestAnimationFrame(tick);}
+async function load(){const paths={club:'assets/club.png',cast:'assets/cast.png'};await Promise.all(Object.entries(paths).map(async([key,src])=>{const im=new Image();im.src=src;try{await im.decode();images[key]=im;}catch{console.warn('Asset unavailable:',src);}}));atlas=globalThis.ACTOR_ATLAS||null;$('loading').hidden=true;saveRecord();updateUI();if(params.has('play')){sim.start();$('overlay').hidden=true;}if(QA){sim.start();$('overlay').hidden=true;clock=Number(params.get('time'))||3;sim.player.invuln=0;}updateCamera(0,true);window.__game={sim,input,render,updateUI,images,atlas,camera,controls,duet,version:'0.3.2'};requestAnimationFrame(tick);}
 load();
