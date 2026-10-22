@@ -11,6 +11,13 @@ const camera={zoom:1.65,x:251,y:522,level:-1,viewport:{x:0,y:154,width:540,heigh
 const duet={amount:0,target:null,side:1};
 const reaction={remaining:0};
 const comic={time:0,emitter:0,sequence:0};
+// Stage and lounge performers give the club a crowd without changing mission targets.
+const clubGuests=[
+  {x:126,y:326},{x:217,y:320},{x:323,y:320},{x:414,y:326},
+  {x:125,y:385},{x:405,y:385},{x:125,y:485},{x:405,y:485},
+  {x:125,y:585},{x:405,y:585},{x:125,y:685},{x:405,y:685}
+].map((p,i)=>({...p,id:i,phase:i*1.37,guest:true}));
+function dancerKind(d){return 2+(d.id||0)%Math.max(2,(atlas?.actors.length||4)-2);}
 function updateDuet(dt){
   if(sim.mode==='paused')return;
   const target=sim.dancing&&sim.activeTarget;
@@ -102,7 +109,7 @@ function actor(entity,kind,scale=1){
   const pose=duetPose(entity),x=pose.x,y=pose.y,s=atlas?.actors[kind];
   const rest=kind>1?restPose(entity):0;
   const size=(kind===1?65:kind===0?68:56)*scale*(1-.06*rest);
-  const rawPhase=entity.phase||clock,frames=kind===0?14:16;
+  const rawPhase=entity.guest?clock*.9+entity.phase:entity.phase||clock,frames=kind===0?14:16;
   const phase=Math.floor(rawPhase/(Math.PI*2)*frames)/frames*Math.PI*2;
   const walking=kind===1||kind===0&&Math.hypot(entity.vx,entity.vy)>5;
   const step=walking?Math.sin(phase):0,idle=kind>1?Math.sin(phase*1.8)*.35*(1-rest):0;
@@ -144,13 +151,14 @@ function render(t){
   if(shake>0)ctx.translate(Math.sin(t*74)*shake*7,Math.cos(t*81)*shake*4);
   backdrop();lights(t);if(sim.badLight){ctx.fillStyle='#1d12383d';ctx.fillRect(0,180,540,595);}
   for(const p of sim.pickups)pickup(p,t);
-  const cloud=comicState(),actors=sim.dancers.map(d=>({e:d,k:d.kind,scale:1}));
+  const cloud=comicState(),actors=sim.dancers.map(d=>({e:d,k:dancerKind(d),scale:1}));
+  for(const guest of clubGuests)actors.push({e:guest,k:dancerKind(guest),scale:.85});
   actors.push({e:sim.player,k:0,scale:1});for(const g of sim.guards)actors.push({e:g,k:1,scale:g.assistant?.92:1});
   if(cloud)actors.push({e:{y:cloud.y+3},cloud});
   actors.sort((a,b)=>a.e.y-b.e.y);
   for(const a of actors){
     if(a.cloud){comicCloud(a.cloud,QA?t:comic.time);continue;}
-    ctx.save();if(a.e.done)ctx.globalAlpha=.9;
+    ctx.save();if(a.e.guest)ctx.globalAlpha=.72;else if(a.e.done)ctx.globalAlpha=.9;
     if(cloud&&(a.e===sim.player||a.e===duet.target))ctx.globalAlpha*=1-cloud.alpha;
     actor(a.e,a.k,a.scale);ctx.restore();
   }
@@ -171,5 +179,5 @@ function render(t){
   bottom.addColorStop(0,'#10142100');bottom.addColorStop(1,'#101421cc');ctx.fillStyle=bottom;ctx.fillRect(0,730,540,70);ctx.restore();
 }
 function tick(now){const dt=Math.min(.05,Math.max(0,(now-last)/1000||0));last=now;if(!QA)clock+=dt;updateInput();sim.step(QA?0:dt,input);consumeEvents();updateDuet(QA?0:dt);updateComic(QA?0:dt);if(sim.mode==='playing'){for(const p of particles){p.x+=p.vx*dt;p.y+=p.vy*dt;p.vy+=25*dt;p.life-=dt;}particles=particles.filter(p=>p.life>0);for(const f of floaters){f.y-=dt*22;f.life-=dt;}floaters=floaters.filter(f=>f.life>0);}if(sim.mode==='playing')reaction.remaining=Math.max(0,reaction.remaining-dt);shake=Math.max(0,shake-dt);if(toastTimer>0){toastTimer-=dt;if(toastTimer<=0)$('toast').classList.remove('visible');}if(now>nextUI){updateUI();nextUI=now+80;}updateCamera(dt,QA);render(clock);requestAnimationFrame(tick);}
-async function load(){const paths={club:'assets/club.png',cast:'assets/cast.png',cloud:'assets/cloud.png',lips:'assets/lips.png'};await Promise.all(Object.entries(paths).map(async([key,src])=>{const im=new Image();im.src=src;try{await im.decode();images[key]=im;}catch{console.warn('Asset unavailable:',src);}}));atlas=globalThis.ACTOR_ATLAS||null;$('loading').hidden=true;saveRecord();updateUI();if(params.has('play')){sim.start();$('overlay').hidden=true;}if(QA){sim.start();$('overlay').hidden=true;clock=Number(params.get('time'))||3;sim.player.invuln=0;}updateCamera(0,true);window.__game={sim,input,render,updateUI,images,atlas,camera,controls,duet,comic,version:'0.4.2'};requestAnimationFrame(tick);}
+async function load(){const paths={club:'assets/club.png',cast:'assets/cast.png',cloud:'assets/cloud.png',lips:'assets/lips.png'};await Promise.all(Object.entries(paths).map(async([key,src])=>{const im=new Image();im.src=src;try{await im.decode();images[key]=im;}catch{console.warn('Asset unavailable:',src);}}));atlas=globalThis.ACTOR_ATLAS||null;$('loading').hidden=true;saveRecord();updateUI();if(params.has('play')){sim.start();$('overlay').hidden=true;}if(QA){sim.start();$('overlay').hidden=true;clock=Number(params.get('time'))||3;sim.player.invuln=0;}updateCamera(0,true);window.__game={sim,input,render,updateUI,images,atlas,camera,controls,duet,comic,clubGuests,version:'0.5.0'};requestAnimationFrame(tick);}
 load();
