@@ -2,7 +2,8 @@
 'use strict';
 const $=id=>document.getElementById(id),canvas=$('scene'),ctx=canvas.getContext('2d');
 const sim=new GameSim(RULES);const params=new URLSearchParams(location.search);const QA=params.has('qa');
-let images={},atlas=null,clock=0,last=0,record=0,muted=true,audio=null,nextUI=0,toastTimer=0,particles=[],floaters=[],shake=0,helpReturn=null;
+let images={},atlas=null,clock=0,last=0,record=0,muted=false,audio=null,nextUI=0,toastTimer=0,particles=[],floaters=[],shake=0,helpReturn=null;
+const music=$('soundtrack');music.volume=.5;
 try{record=Number(localStorage.getItem('satyr-record-v1'))||0;}catch{}
 const input={x:0,y:0,action:false},keys=new Set();let controls=null;
 const pad=v=>String(Math.floor(v)).padStart(6,'0');
@@ -48,12 +49,24 @@ function text(s,x,y,size=14,color='#ffe8bf',align='center'){ctx.font=`${size}px 
 function notify(s){$('toast').textContent=s;$('toast').classList.add('visible');toastTimer=3;}
 function saveRecord(){if(sim.score>record){record=sim.score;try{localStorage.setItem('satyr-record-v1',String(record));}catch{}}$('record').textContent='РЕКОРД '+pad(record);}
 function sound(type){if(muted)return;try{audio??=new(window.AudioContext||window.webkitAudioContext)();audio.resume();const at=audio.currentTime;const notes=type==='dancer'?[523,659,784]:type==='caught'?[190,130]:type==='cleared'?[523,659,784,1046]:[392,523];notes.forEach((freq,i)=>{const o=audio.createOscillator(),g=audio.createGain();o.type='triangle';o.frequency.value=freq;g.gain.setValueAtTime(0,at+i*.09);g.gain.linearRampToValueAtTime(.06,at+i*.09+.01);g.gain.exponentialRampToValueAtTime(.001,at+i*.09+.2);o.connect(g).connect(audio.destination);o.start(at+i*.09);o.stop(at+i*.09+.22);});}catch{}}
-function setOverlay(title,copy,button,secondary=false,instructions=false){$('modal-title').innerHTML=title;$('modal-copy').textContent=copy;$('play').innerHTML=button+' <span>↗</span>';$('secondary').hidden=!secondary;$('instructions').hidden=!instructions;$('overlay').hidden=false;saveRecord();clearInput();}
+function syncMusic(){
+  music.muted=muted;
+  $('sound').setAttribute('aria-label',muted?'Включить звук':'Выключить звук');
+  $('sound').setAttribute('aria-pressed',String(!muted));
+  $('sound').querySelector('span').hidden=!muted;
+  if(muted||sim.mode!=='playing'||document.hidden){music.pause();return;}
+  // Call play directly from Start/Resume and the sound button for mobile browsers.
+  const playing=music.play();
+  playing?.catch(error=>{if(error.name!=='AbortError'&&sim.mode==='playing'&&!muted)notify('Нажми ♪, чтобы включить музыку.');});
+}
+function rewindMusic(){try{music.currentTime=0;}catch{}}
+function setOverlay(title,copy,button,secondary=false,instructions=false){$('modal-title').innerHTML=title;$('modal-copy').textContent=copy;$('play').innerHTML=button+' <span>↗</span>';$('secondary').hidden=!secondary;$('instructions').hidden=!instructions;$('overlay').hidden=false;saveRecord();clearInput();syncMusic();}
 function clearInput(){keys.clear();controls?.reset();input.x=input.y=0;input.action=false;$('action').classList.remove('active');}
-function start(){if(helpReturn!==null){sim.mode=helpReturn;helpReturn=null;if(sim.mode==='ready'){setOverlay('Выходи<br>на танцпол.','Зажги настроение каждой танцовщицы и не попадись охране.','НАЧАТЬ ВЕЧЕР',false,true);return;}}else if(sim.mode==='cleared')sim.nextLevel();else if(sim.mode==='paused')sim.mode='playing';else{sim.reset();sim.start();}if(sim.mode==='playing'){$('overlay').hidden=true;sound('start');notify(`Миссия ${sim.level+1}: зажги ${sim.target} номеров`);}updateUI();}
+function start(){if(helpReturn!==null){sim.mode=helpReturn;helpReturn=null;if(sim.mode==='ready'){setOverlay('Выходи<br>на танцпол.','Зажги настроение каждой танцовщицы и не попадись охране.','НАЧАТЬ ВЕЧЕР',false,true);return;}}else if(sim.mode==='cleared')sim.nextLevel();else if(sim.mode==='paused')sim.mode='playing';else{sim.reset();sim.start();rewindMusic();}if(sim.mode==='playing'){$('overlay').hidden=true;syncMusic();sound('start');notify(`Миссия ${sim.level+1}: зажги ${sim.target} номеров`);}updateUI();}
 function pause(){if(sim.mode==='playing'){sim.mode='paused';setOverlay('Антракт.','Вечер подождёт. Вернись, когда будешь готов.','ПРОДОЛЖИТЬ',true);}else if(sim.mode==='paused')start();}
-$('play').addEventListener('click',start);$('pause').addEventListener('click',pause);$('secondary').addEventListener('click',()=>{helpReturn=null;sim.reset();sim.start();$('overlay').hidden=true;updateUI();});$('help').addEventListener('click',()=>{helpReturn=sim.mode;if(sim.mode==='playing')sim.mode='paused';setOverlay('Твой выход.','Обойди танцпол, подними настроение всем и избегай двух охранников.','ПОНЯТНО',false,true);});
-$('sound').addEventListener('click',()=>{muted=!muted;$('sound').setAttribute('aria-label',muted?'Включить звук':'Выключить звук');$('sound').querySelector('span').hidden=!muted;if(!muted)sound('start');});
+$('play').addEventListener('click',start);$('pause').addEventListener('click',pause);$('secondary').addEventListener('click',()=>{helpReturn=null;sim.reset();sim.start();rewindMusic();$('overlay').hidden=true;syncMusic();updateUI();});$('help').addEventListener('click',()=>{helpReturn=sim.mode;if(sim.mode==='playing')sim.mode='paused';setOverlay('Твой выход.','Обойди танцпол, подними настроение всем и избегай двух охранников.','ПОНЯТНО',false,true);});
+$('sound').addEventListener('click',()=>{muted=!muted;syncMusic();if(!muted)sound('start');});
+window.addEventListener('pagehide',()=>music.pause());
 window.addEventListener('keydown',e=>{if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space','KeyW','KeyA','KeyS','KeyD','Escape','KeyP'].includes(e.code)){e.preventDefault();if(e.code==='Escape'||e.code==='KeyP'){if(!e.repeat)pause();return;}keys.add(e.code);}});window.addEventListener('keyup',e=>keys.delete(e.code));window.addEventListener('blur',()=>{clearInput();if(sim.mode==='playing')pause();});document.addEventListener('visibilitychange',()=>{if(document.hidden&&sim.mode==='playing')pause();});
 controls=new CentralJoystick($('joystick'),()=>sim.mode==='playing');
 function updateInput(){const touch=controls.read();input.x=touch.x+(keys.has('ArrowRight')||keys.has('KeyD')?1:0)-(keys.has('ArrowLeft')||keys.has('KeyA')?1:0);input.y=touch.y+(keys.has('ArrowDown')||keys.has('KeyS')?1:0)-(keys.has('ArrowUp')||keys.has('KeyW')?1:0);input.action=keys.has('Space')||touch.action;$('action').classList.toggle('active',input.action);}
@@ -179,5 +192,5 @@ function render(t){
   bottom.addColorStop(0,'#10142100');bottom.addColorStop(1,'#101421cc');ctx.fillStyle=bottom;ctx.fillRect(0,730,540,70);ctx.restore();
 }
 function tick(now){const dt=Math.min(.05,Math.max(0,(now-last)/1000||0));last=now;if(!QA)clock+=dt;updateInput();sim.step(QA?0:dt,input);consumeEvents();updateDuet(QA?0:dt);updateComic(QA?0:dt);if(sim.mode==='playing'){for(const p of particles){p.x+=p.vx*dt;p.y+=p.vy*dt;p.vy+=25*dt;p.life-=dt;}particles=particles.filter(p=>p.life>0);for(const f of floaters){f.y-=dt*22;f.life-=dt;}floaters=floaters.filter(f=>f.life>0);}if(sim.mode==='playing')reaction.remaining=Math.max(0,reaction.remaining-dt);shake=Math.max(0,shake-dt);if(toastTimer>0){toastTimer-=dt;if(toastTimer<=0)$('toast').classList.remove('visible');}if(now>nextUI){updateUI();nextUI=now+80;}updateCamera(dt,QA);render(clock);requestAnimationFrame(tick);}
-async function load(){const paths={club:'assets/club.png',cast:'assets/cast.png',cloud:'assets/cloud.png',lips:'assets/lips.png'};await Promise.all(Object.entries(paths).map(async([key,src])=>{const im=new Image();im.src=src;try{await im.decode();images[key]=im;}catch{console.warn('Asset unavailable:',src);}}));atlas=globalThis.ACTOR_ATLAS||null;$('loading').hidden=true;saveRecord();updateUI();if(params.has('play')){sim.start();$('overlay').hidden=true;}if(QA){sim.start();$('overlay').hidden=true;clock=Number(params.get('time'))||3;sim.player.invuln=0;}updateCamera(0,true);window.__game={sim,input,render,updateUI,images,atlas,camera,controls,duet,comic,clubGuests,version:'0.5.0'};requestAnimationFrame(tick);}
+async function load(){const paths={club:'assets/club.png',cast:'assets/cast.png',cloud:'assets/cloud.png',lips:'assets/lips.png'};await Promise.all(Object.entries(paths).map(async([key,src])=>{const im=new Image();im.src=src;try{await im.decode();images[key]=im;}catch{console.warn('Asset unavailable:',src);}}));atlas=globalThis.ACTOR_ATLAS||null;$('loading').hidden=true;saveRecord();updateUI();if(params.has('play')){sim.start();$('overlay').hidden=true;}if(QA){sim.start();$('overlay').hidden=true;clock=Number(params.get('time'))||3;sim.player.invuln=0;}updateCamera(0,true);window.__game={sim,input,render,updateUI,images,atlas,camera,controls,duet,comic,clubGuests,music,version:'0.5.1'};requestAnimationFrame(tick);}
 load();
